@@ -45,14 +45,14 @@ $c['notAllowedHandler'] = function ($c) {
 /**
  *
  */
-/*$c['errorHandler'] = function ($c) {
+$c['errorHandler'] = function ($c) {
     return function ($req, $res, $exception) use ($c) {
         return $c['response']
           ->withStatus(500)
           ->withHeader('Content-Type', 'application/json')
           ->write(JsonHelper::fail('La richiesta ha generato un errore inaspettato.'));
     };
-};*/
+};
 
 /**
  *
