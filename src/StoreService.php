@@ -1,7 +1,7 @@
 <?php
 namespace Sideco;
 
-use \Sideco\PostgreSQL;
+use \Sideco\PostgreSQL as DB;
 use \Sideco\Config;
 
 class StoreService
@@ -22,98 +22,372 @@ class StoreService
     }
 
     /**
-    *
-    */
-    public function units()
+     *
+     */
+    public function catalog($table = null)
     {
-        $tipo = [
-          'residenziale',
-          'commerciale',
-          'uffici',
-          'scuole',
-          'impianti sportivi'
-        ];
 
-        $q = 'SELECT * FROM unita';
+        if (is_null($table)) {
+            $q =
+                "
+                SELECT *
+                FROM pg_catalog.pg_tables
+                WHERE schemaname = 'public'
+                ";
 
-        $sth = PostgreSQL::instance()->prepare($q);
+            $sth = DB::instance()->query($q);
+        } else {
+
+            // Sanitizzo il nome della tabella
+            $table = preg_replace('|[^a-z_]*|i', '', $table);
+
+            $q = "SELECT * FROM {$table} LIMIT 10";
+
+            try {
+                $sth = DB::instance()->prepare($q);
+                $sth->execute();
+            } catch (\PDOException $e) {
+                return false;
+            }
+        }
+
+        $raw = $sth->fetchAll();
+
+        if (!is_null($table)) return $raw;
+
+        $data = [];
+        foreach ($raw as $table) {
+            $data[] = $table->tablename;
+        }
+
+        return $data;
+    }
+
+    /**
+     *
+     */
+    public function getUtenza($id_utenza)
+    {
+        $q =
+            '
+            SELECT
+                u.id id_utenza,
+                u.codice_fiscale,
+                u.tipologia
+            FROM utenze u
+            WHERE u.id = :id_utenza
+            LIMIT 1
+            ';
+
+        $sth = DB::instance()->prepare($q);
+            $sth->bindParam(':id_utenza', $id_utenza, \PDO::PARAM_INT);
         $sth->execute();
 
-        $result = $sth->fetchAll(\PDO::FETCH_ASSOC);
+        return $sth->fetch();
+    }
+
+    /**
+     *
+     */
+    public function getUnitaImmobiliariByUtenza($id_utenza)
+    {
+        $q =
+            '
+            SELECT
+                uu.id_edificio,
+                uu.num_contatore_elettrico numero_contatore,
+                uu.tipo tipologia,
+                uu.cf_intestatario codice_fiscale,
+                uu.consumi_elettrici_kwh_anno,
+                uu.consumi_idrici_mc_anno,
+                uu.consumi_gas_mc_anno,
+                uu.subalterno,
+                uu.potenza_disponibile,
+                uu.note
+            FROM utenze u, unita uu
+            WHERE u.id = :id_utenza
+                AND u.codice_fiscale = uu.cf_intestatario
+            ';
+
+        $sth = DB::instance()->prepare($q);
+            $sth->bindParam(':id_utenza', $id_utenza, \PDO::PARAM_INT);
+        $sth->execute();
+
+        $tipologia = [
+            0 => 'residenziale',
+            1 => 'commerciale',
+            2 => 'uffici',
+            3 => 'scuole',
+            4 => 'impianti sportivi'
+        ];
+
         $retval = [];
 
-        foreach ($result as $unit) {
-          $retval[] = [
-            'tipo' => $tipo[ $unit['tipo'] ],
-            'numero_contatore' => $unit['num_contatore_elettrico'],
-            'codice_fiscale' => $unit['cf_intestatario']
-          ];
+        $results = $sth->fetchAll();
+
+        // Normalizzo
+        foreach ($results as $result) {
+            $ui = array();
+            $ui['id_edificio'] = $result->id_edificio;
+            $ui['numero_contatore'] = $result->numero_contatore;
+            $ui['tipologia'] = $tipologia[$result->tipologia];
+            $ui['codice_fiscale'] = $result->codice_fiscale;
+            $ui['consumi_annuali'] = [
+                'elettrici_kwh' => $result->consumi_elettrici_kwh_anno,
+                'idrici_mc' => $result->consumi_idrici_mc_anno,
+                'gas_mc' => $result->consumi_gas_mc_anno
+            ];
+            $ui['subalterno'] = $result->subalterno;
+            $ui['potenza_disponibile'] = $result->potenza_disponibile;
+            $ui['note'] = $result->note;
+
+            $retval[$result->numero_contatore] = $ui;
         }
 
-        return [
-          'success' => true,
-          'payload' => $retval
-        ];
+        return $retval;
     }
 
     /**
-    *
-    */
-    public function users()
-    {
-        $q = 'SELECT * FROM dati_utenze_monitorate';
+     *
+     */
+    public function getNumeroContatoriByUtenza($id_utenza) {
+        $q =
+            '
+            SELECT DISTINCT ON (ui.num_contatore_elettrico)
+                ui.num_contatore_elettrico numero_contatore
+            FROM utenze u, unita ui
+            WHERE u.id = :id_utenza
+                AND u.codice_fiscale = ui.cf_intestatario
+            ';
 
-        $sth = PostgreSQL::instance()->prepare($q);
+        $sth = DB::instance()->prepare($q);
+            $sth->bindParam(':id_utenza', $id_utenza, \PDO::PARAM_INT);
         $sth->execute();
 
-        return $sth->fetchAll(\PDO::FETCH_OBJ);
+        $result = [];
+
+        while ($row = $sth->fetch()) {
+            $result[] = (string)$row->numero_contatore;
+        }
+
+        return $result;
     }
 
     /**
-    *
-    */
-    public function authenticate($numero_contatore, $codice_fiscale)
+     *
+     */
+    public function getEdificio($id_edificio)
     {
-        $q = 'SELECT * FROM dati_utenze_monitorate WHERE numero_contatore = :numero_contatore AND codice_fiscale = :codice_fiscale LIMIT 1';
+        $q =
+            '
+            SELECT *
+            FROM edificio e
+            WHERE e.id_edificio = :id_edificio
+            LIMIT 1
+            ';
 
-        try {
-          $sth = PostgreSQL::instance()->prepare($q);
-          $sth->bindParam(':numero_contatore', $numero_contatore);
-          $sth->bindParam(':codice_fiscale', $codice_fiscale);
-          $sth->execute();
+        $sth = DB::instance()->prepare($q);
+            $sth->bindParam(':id_edificio', $id_edificio, \PDO::PARAM_INT);
+        $sth->execute();
 
-          $result = $sth->fetch(\PDO::FETCH_ASSOC);
+        $result = $sth->fetch();
+        $retval = [];
 
-          if (!$result) return [
-            'success' => false,
-            'message' => 'Numero contatore e/o codice fiscale errati.'
-          ];
+        if (!$result) return $retval;
 
-          return [
-            'success' => true,
-            'message' => 'Autenticazione effettuata con successo.',
-            'payload' => $result
-          ];
+        $destinazioneUso = [
+            0 => 'civile abitazione',
+            1 => 'commerciale',
+            2 => 'p.a. uffici',
+            3 => 'p.a. scuola',
+            4 => 'p.a. altro',
+            5 => 'misto'
+        ];
 
-        } catch (\PDOException $e) {
-          return [
-            'success' => false,
-            'message' => 'errore durante l\'esecuzione della query.'
-          ];
+        // Normalizzo
+        $retval['id_edificio'] = $result->id_edificio;
+        $retval['destinazione_uso'] = $destinazioneUso[$result->destinazione_uso];
+        $retval['denominazione'] = $result->denominazione;
+        $retval['identificativi_catastali'] = [
+            'foglio' => $result->foglio_catastale,
+            'particella' => $result->particella_catastale
+        ];
+        $retval['anno_costruzione'] = $result->anno_costr;
+        $retval['anno_ristrutturazione'] = $result->anno_ristr;
+        $retval['utenze_giornaliere'] = $result->num_utenti_giorno;
+        $retval['superficie_totale_mq'] = $result->superficie_totale_mq;
+        $retval['volume_totale_mc'] = $result->volume_totale_mc;
+        $retval['numero_piani'] = $result->numero_piani;
+        $retval['numero_piani_interrati'] = $result->numero_piani_interr;
+        $retval['consumi_annuali'] = [
+            'gasolio_lt' => $result->consumi_gasolio_litri_anno,
+            'gas_mc' => $result->consumi_gas_mc_anno,
+            'olio_lt' => $result->consumi_olio_litri_anno,
+            'gpl_lt' => $result->consumi_gpl_litri_anno
+        ];
+        $retval['tipologia_riscaldamento'] = $result->tipologia_riscaldamento;
+        $retval['tipologia_climatizzazione_estiva'] = $result->tipologia_climatizzazione_estiva;
+        $retval['potenza_disponibile_w'] = $result->potenza_disponibile;
+
+        return $retval;
+    }
+
+    /**
+     *
+     */
+    public function getDatiFornituraElettrica($codiceFiscale) {
+        $q =
+            '
+            SELECT
+                b.anno,
+                b.num_mesi_fatturazione numero_mesi_fatturazione,
+                b.ammontare_netto_iva,
+                b.kw_fatturati
+            FROM dati_fornitura a, dati_fornitura_rilevamenti b
+            WHERE b.fk_dati_fornitura = a.id_dati_fornitura
+                AND b.cf_titolare = :codice_fiscale
+                AND b.tipologia = \'E\'
+            ORDER BY b.anno ASC
+            ';
+
+        $sth = DB::instance()->prepare($q);
+            $sth->bindParam(':codice_fiscale', $codiceFiscale, \PDO::PARAM_STR);
+        $sth->execute();
+
+        return $sth->fetchAll();
+    }
+
+    /**
+     *
+     */
+    public function getDatiFornituraIdrica($codiceFiscale) {
+        return [];
+    }
+
+    /**
+     *
+     */
+    public function getDatiFornituraGas($codiceFiscale) {
+        $q =
+            '
+            SELECT
+                a.anno,
+                a.num_mesi_fatturati numero_mesi_fatturazione,
+                a.ammontare_fatturato ammontare_netto_iva,
+                a.consumo_fatturato mc_fatturati
+            FROM gas_rilevamenti a
+            WHERE a.cf_titolare = :codice_fiscale
+            ORDER BY a.anno ASC
+            ';
+
+        $sth = DB::instance()->prepare($q);
+            $sth->bindParam(':codice_fiscale', $codiceFiscale, \PDO::PARAM_STR);
+        $sth->execute();
+
+        return $sth->fetchAll();
+    }
+
+    /**
+     *
+     */
+    public function getProfile($id_utenza, $verbose = 0)
+    {
+        $retval = [];
+
+        $retval = $this->getUtenza($id_utenza);
+
+        if (!$retval) return false;
+
+        $retval->edifici = [];
+
+        $unitaImmobiliari = $this->getUnitaImmobiliariByUtenza($id_utenza);
+
+        // Prepara la mappa che associa l'edificio all'unità immobiliare
+        $edificioUnita = [];
+        foreach ($unitaImmobiliari as $ui) {
+            $edificioUnita[$ui['id_edificio']][] = $ui['numero_contatore'];
         }
+
+        // Popola il campo unità_immobiliari dell'edificio
+        foreach ($edificioUnita as $edificioId => $numeriContatore) {
+            $edificio = $this->getEdificio($edificioId);
+
+            $edificio['unita_immobiliari'] = [];
+            foreach ($numeriContatore as $numeroContatore) {
+                $edificio['unita_immobiliari'][] = $unitaImmobiliari[$numeroContatore];
+            }
+
+            $retval->edifici[] = $edificio;
+        }
+
+        // Popola il campo storico_consumi dell'utenza
+        $retval->storico_consumi['elettrici'] = $this->getDatiFornituraElettrica($retval->codice_fiscale);
+        $retval->storico_consumi['idrici'] = $this->getDatiFornituraIdrica($retval->codice_fiscale);
+        $retval->storico_consumi['gas'] = $this->getDatiFornituraGas($retval->codice_fiscale);
+
+        return $retval;
+    }
+
+    /**
+     *
+     */
+    private function prepareOpenTSDBQueryString(array $args = array()) {
+
+        $defaults = [
+            'start' => '1h-ago',
+            'end' => time(),
+            'aggregator' => 'sum',
+            'downsample' => '',
+            'metric' => '',
+            'tags' => []
+        ];
+
+        $args = array_merge($defaults, $args);
+
+        $tags = [];
+        foreach ($args['tags'] as $k => $v) {
+            $tags[] = "{$k}={$v}";
+        }
+        $tags = join(',', $tags);
+
+        $tags = $tags ? "{{$tags}}" : '';
+
+        $aggregator = $args['aggregator'] ? "{$args['aggregator']}:" : '';
+        $metric = $args['metric'];
+        $downsample = $args['downsample'] ? "{$args['downsample']}:" : '';
+
+        $url = "?start={$args['start']}&end={$args['end']}&m={$aggregator}{$downsample}{$metric}{$tags}";
+
+        return $url;
     }
 
     /*
     *
     */
-    public function dps($start, $query)
+    public function getSensoreDataByNumeroContatore($numero_contatore, $metrica, $canale = 1, array $queryParams = array())
     {
-        $url = 'http://' . Config::OPENTSDB_HOST . ':' . Config::OPENTSDB_PORT . "?start={$start}&m={$query}";
+        $defaultParams = [
+            'start' => '1h-ago',
+            'end' => time(),
+            'aggregator' => 'sum',
+            'downsample' => ''
+        ];
+        $queryParams = array_merge($defaultParams, $queryParams);
+
+        $q = $this->prepareOpenTSDBQueryString(
+            array_merge($queryParams, [
+                'metric' => $metrica,
+                'tags' => [
+                    'utenza' => $numero_contatore,
+                    'canale' => $canale
+                ]
+            ])
+        );
+
+        $url = 'http://' . Config::SIDECO_HOST . ':' . Config::OPENTSDB_PORT . "/api/query/{$q}";
 
         $data = @file_get_contents($url);
 
-        if (false === $data) return ['error' => 'Errore'];
-
-        return $data;
+        return $data ? json_decode($data) : false;
     }
 }
