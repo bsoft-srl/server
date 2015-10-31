@@ -318,15 +318,30 @@ class StoreService
         while ($row = $sth->fetch()) {
             $result['mac_address'] = $row->mac;
             $result['numero_canali'] = $row->numero_canali;
-            $result['numero_contatore'] = $row->numero_contatore;
+            //$result['numero_contatore'] = $row->numero_contatore;
             $result['tipologia'] = $tipologia[$row->tipologia];
             $result['in_manutenzione'] = $row->manutenzione;
             $result['ultimo_aggiornamento'] = $row->lastupdate;
 
-            $results[] = $result;
+            $results[$row->numero_contatore][] = $result;
         }
 
         return $results;
+    }
+
+    public function getZonaByNumeroContatore($numero_contatore) {
+        $q =
+            '
+            SELECT *
+            FROM zona z
+            WHERE z.id_unita = :numero_contatore
+            ';
+
+        $sth = DB::instance()->prepare($q);
+            $sth->bindParam(':numero_contatore', $numero_contatore, \PDO::PARAM_INT);
+        $sth->execute();
+
+        return $sth->fetchAll();
     }
 
     /**
@@ -361,6 +376,7 @@ class StoreService
 
             $retval->edifici[] = $edificio;
         }
+
 
         // Popola il campo sensori
         $retval->sensori_installati = $this->getSensoriByUtenza($id_utenza);
