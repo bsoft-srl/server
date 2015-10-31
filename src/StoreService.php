@@ -329,16 +329,20 @@ class StoreService
         return $results;
     }
 
-    public function getZonaByNumeroContatore($numero_contatore) {
+    /**
+     *
+     */
+    public function getZonaByNumeroContatore($numeroContatore) {
         $q =
             '
             SELECT *
             FROM zona z
             WHERE z.id_unita = :numero_contatore
+            LIMIT 1
             ';
 
         $sth = DB::instance()->prepare($q);
-            $sth->bindParam(':numero_contatore', $numero_contatore, \PDO::PARAM_INT);
+            $sth->bindParam(':numero_contatore', $numeroContatore, \PDO::PARAM_INT);
         $sth->execute();
 
         return $sth->fetchAll();
@@ -347,17 +351,46 @@ class StoreService
     /**
      *
      */
-    public function getProfile($id_utenza, $verbose = 0)
-    {
-        $retval = [];
+    public function getIlluminazioneByZona($idZona) {
+        $q =
+            '
+            SELECT *
+            FROM illuminazione i
+            WHERE i.id_zona = :id_zona
+            ';
 
-        $retval = $this->getUtenza($id_utenza);
+        $sth = DB::instance()->prepare($q);
+            $sth->bindParam(':id_zona', $idZona, \PDO::PARAM_INT);
+        $sth->execute();
 
-        if (!$retval) return false;
+        return $sth->fetchAll();
+    }
 
-        $retval->edifici = [];
+    /**
+     *
+     */
+    private function populateStoricoConsumi($codiceFiscale) {
+        $storicoConsumi['elettrici'] = $this->getDatiFornituraElettrica($codiceFiscale);
+        $storicoConsumi['idrici'] = $this->getDatiFornituraIdrica($codiceFiscale);
+        $storicoConsumi['gas'] = $this->getDatiFornituraGas($codiceFiscale);
 
-        $unitaImmobiliari = $this->getUnitaImmobiliariByUtenza($id_utenza);
+        return $storicoConsumi;
+    }
+
+    /**
+     *
+     */
+    private function populateSensoriInstallati($idUtenza) {
+        return $this->getSensoriByUtenza($idUtenza);
+    }
+
+    /**
+     *
+     */
+    private function populateEdifici($idUtenza) {
+
+        $edifici = [];
+        $unitaImmobiliari = $this->getUnitaImmobiliariByUtenza($idUtenza);
 
         // Prepara la mappa che associa l'edificio all'unità immobiliare
         $edificioUnita = [];
@@ -371,20 +404,43 @@ class StoreService
 
             $edificio['unita_immobiliari'] = [];
             foreach ($numeriContatore as $numeroContatore) {
-                $edificio['unita_immobiliari'][] = $unitaImmobiliari[$numeroContatore];
+                $unitaImmobiliare = $unitaImmobiliari[$numeroContatore];
+
+                $zona = $this->getZonaByNumeroContatore($numeroContatore);
+                $zona['illuminazione'] = $this->getIlluminazioneByZona($zona->id);
+
+                $unitaImmobiliare['zona'] = $zona;
+                $edificio['unita_immobiliari'][] = $unitaImmobiliare;
+                //$edificio['unita_immobiliari'][] = $unitaImmobiliari[$numeroContatore];
             }
 
-            $retval->edifici[] = $edificio;
+            $edifici[] = $edificio;
         }
 
 
-        // Popola il campo sensori
-        $retval->sensori_installati = $this->getSensoriByUtenza($id_utenza);
 
-        // Popola il campo storico_consumi dell'utenza
-        $retval->storico_consumi['elettrici'] = $this->getDatiFornituraElettrica($retval->codice_fiscale);
-        $retval->storico_consumi['idrici'] = $this->getDatiFornituraIdrica($retval->codice_fiscale);
-        $retval->storico_consumi['gas'] = $this->getDatiFornituraGas($retval->codice_fiscale);
+        return $edifici;
+    }
+
+    /**
+     *
+     */
+    public function getProfile($idUtenza) {
+
+        $utenza = $this->getUtenza($idUtenza);
+
+        if (!$utenza)
+            return false;
+
+        $retval = $utenza;
+
+        //
+        $retval->edifici = $this->populateEdifici($utenza->id_utenza);
+        //
+        $retval->sensori_installati = $this->populateSensoriInstallati($utenza->id_utenza);
+        //
+        $retval->storico_consumi = $this->populateStoricoConsumi($utenza->codice_fiscale);
+
 
         return $retval;
     }
