@@ -290,6 +290,48 @@ class StoreService
     /**
      *
      */
+    public function getSensoriByUtenza($id_utenza) {
+        $q =
+            '
+            SELECT *
+            FROM cap_smartmeter s
+            WHERE s.numero_contatore IN(
+                SELECT DISTINCT ON (ui.num_contatore_elettrico)
+                    ui.num_contatore_elettrico numero_contatore
+                FROM utenze u, unita ui
+                WHERE u.id = :id_utenza
+                    AND u.codice_fiscale = ui.cf_intestatario
+            )
+            ';
+
+        $sth = DB::instance()->prepare($q);
+            $sth->bindParam(':id_utenza', $id_utenza, \PDO::PARAM_INT);
+        $sth->execute();
+
+        $tipologia = [
+            0 => 'misuratore contatore elettrico',
+            1 => 'misuratore ad impulsi generico',
+            2 => 'misuratore ambientale'
+        ];
+
+        $results = [];
+        while ($row = $sth->fetch()) {
+            $result['mac_address'] = $row->mac;
+            $result['numero_canali'] = $row->numero_canali;
+            $result['numero_contatore'] = $row->numero_contatore;
+            $result['tipologia'] = $tipologia[$row->tipologia];
+            $result['in_manutenzione'] = $row->manutenzione;
+            $result['ultimo_aggiornamento'] = $row->lastupdate;
+
+            $results[] = $result;
+        }
+
+        return $results;
+    }
+
+    /**
+     *
+     */
     public function getProfile($id_utenza, $verbose = 0)
     {
         $retval = [];
@@ -319,6 +361,9 @@ class StoreService
 
             $retval->edifici[] = $edificio;
         }
+
+        // Popola il campo sensori
+        $retval->sensori_installati = $this->getSensoriByUtenza($id_utenza);
 
         // Popola il campo storico_consumi dell'utenza
         $retval->storico_consumi['elettrici'] = $this->getDatiFornituraElettrica($retval->codice_fiscale);
