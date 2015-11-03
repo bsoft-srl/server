@@ -309,9 +309,9 @@ class StoreService
         $sth->execute();
 
         $tipologia = [
-            0 => 'misuratore contatore elettrico',
+            0 => 'energia_elettrica',
             1 => 'misuratore ad impulsi generico',
-            2 => 'misuratore ambientale'
+            2 => 'ambientale'
         ];
 
         $results = [];

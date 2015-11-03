@@ -4,6 +4,7 @@ namespace Sideco;
 use \Sideco\StoreService;
 use \Sideco\AuthService;
 use \Sideco\JsonHelper;
+use \Sideco\Middleware\HandleCors;
 use \Sideco\Middleware\JsonResponse;
 use \Sideco\Middleware\VerifyToken;
 use \Sideco\Middleware\SetACL;
@@ -34,6 +35,14 @@ $c['notFoundHandler'] = function ($c) {
  */
 $c['notAllowedHandler'] = function ($c) {
     return function ($req, $res, $methods) use ($c) {
+
+        /*
+         * Se è una richiesta di preflight la lascio passare
+         */
+        if ($req->isOptions())
+            return $res
+                ->withStatus(204);
+
         return $c['response']
           ->withStatus(405)
           ->withHeader('Allow', implode(', ', $methods))
@@ -58,6 +67,7 @@ $c['errorHandler'] = function ($c) {
  *
  */
 $app = new \Slim\App($c);
+$app->add(new HandleCors);
 
 /**
  *
@@ -146,7 +156,7 @@ $app->group('/api', function () use ($app) {
 
             return $res->write(JsonHelper::success($data));
         })
-        ->add(new setACL)
+        ->add(new SetACL)
         ->add(new VerifyToken);
     } );
 } );
