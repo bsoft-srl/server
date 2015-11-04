@@ -1,28 +1,20 @@
 <?php
 
-namespace Sideco;
+namespace sideco;
 
-use \Sideco\PostgreSQL as DB;
-use \Sideco\Config;
+use \sideco\DB;
+use \sideco\Config;
 use \Firebase\JWT\JWT;
 
-class AuthService
+class Auth
 {
-    private static $instance;
-
-    public static function instance()
-    {
-        if (!self::$instance) self::$instance = new self;
-        return self::$instance;
-    }
-
     /**
      *
      */
-    public function checkLogin($codiceFiscale, $password) {
+    public static function checkLogin($codiceFiscale, $password) {
         $q = '
             SELECT
-                id id_utenza,
+                id,
                 tipologia
             FROM utenze
             WHERE codice_fiscale = :codice_fiscale
@@ -31,8 +23,8 @@ class AuthService
             ';
 
         $sth = DB::instance()->prepare($q);
-            $sth->bindParam(':codice_fiscale', $codiceFiscale, \PDO::PARAM_STR);
-            $sth->bindParam(':password', md5($password), \PDO::PARAM_STR);
+            $sth->bindParam(':codice_fiscale', $codiceFiscale);
+            $sth->bindParam(':password', md5($password));
         $sth->execute();
 
         $result = $sth->fetch();
@@ -43,10 +35,10 @@ class AuthService
     /**
     *
     */
-    public function authenticate($codiceFiscale, $password)
+    public static function authenticate($codiceFiscale, $password)
     {
 
-        $result = $this->checkLogin($codiceFiscale, $password);
+        $result = self::checkLogin($codiceFiscale, $password);
 
         if (!$result) return false;
 
@@ -54,8 +46,8 @@ class AuthService
             'iss' => Config::JWT_ISS,
             'iat' => time(),
             'exp' => time() + 60*60*24, // dura 24 ore
-            'id_utenza' => $result->id_utenza,
-            'tipologia_utenza' => $result->tipologia
+            'id_utenza' => $result['id'],
+            'tipologia' => $result['tipologia']
         ];
 
         $tokenId = JWT::encode($token, Config::JWT_SECRET);
@@ -66,7 +58,7 @@ class AuthService
     /**
      *
      */
-    public function getTokenId(\Slim\Http\Request $req) {
+    public static function getTokenId(\Slim\Http\Request $req) {
         $auth = $req->getHeaderLine('Authorization');
         $hasBearer = preg_match('|Bearer (.+)|', $auth, $m);
 
@@ -80,8 +72,8 @@ class AuthService
     /**
      *
      */
-    public function getToken(\Slim\Http\Request $req) {
-        $tokenId = $this->getTokenId($req);
+    public static function getToken(\Slim\Http\Request $req) {
+        $tokenId = self::getTokenId($req);
 
         if (!$tokenId) return false;
 

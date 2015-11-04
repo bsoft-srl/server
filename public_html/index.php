@@ -1,14 +1,13 @@
 <?php
 namespace Sideco;
 
-use \Sideco\StoreService;
-use \Sideco\AuthService;
-use \Sideco\JsonHelper;
-use \Sideco\Middleware\HandleCors;
-use \Sideco\Middleware\JsonResponse;
-use \Sideco\Middleware\VerifyToken;
-use \Sideco\Middleware\SetACL;
-use \Firebase\JWT\JWT;
+use \sideco\Store;
+use \sideco\middleware\HandleCors;
+use \sideco\middleware\JsonResponse;
+use \sideco\middleware\VerifyToken;
+use \sideco\middleware\SetACL;
+use \sideco\Auth;
+use \sideco\JsonHelper;
 
 define('SIDECO_INIT', true);
 require_once 'autoload.php';
@@ -69,27 +68,31 @@ $c['errorHandler'] = function ($c) {
 $app = new \Slim\App($c);
 $app->add(new HandleCors);
 
-/**
- *
- */
+
 $app->group('/api', function () use ($app) {
     $app->group('/v1', function () use ($app) {
 
-        /**
-         *
-         */
         $app->add(new JsonResponse);
 
         /**
          *
          */
-        $app->post('/authenticate', function ($req, $res) {
+        $app->get('/catalog[/{table}]', function ($req, $res, $args) {
+            $table = isset($args['table']) ? $args['table'] : null;
+            $data = Store::catalog($table);
+            return $res->write(JsonHelper::success($data));
+        });
+
+        /**
+         *
+         */
+        $app->post('/autenticazione', function ($req, $res) {
             $body = $req->getParsedBody();
 
-            $codice_fiscale = isset($body['codice_fiscale']) ? $body['codice_fiscale'] : '';
+            $codiceFiscale = isset($body['codice_fiscale']) ? $body['codice_fiscale'] : '';
             $password = isset($body['password']) ? $body['password'] : '';
 
-            $result = AuthService::instance()->authenticate($codice_fiscale, $password);
+            $result = Auth::authenticate($codiceFiscale, $password);
 
             if (!$result)
                 return $res
@@ -102,34 +105,30 @@ $app->group('/api', function () use ($app) {
         /**
          *
          */
-        $app->get('/catalog[/{table}]', function ($req, $res, $args) {
-            $table = isset($args['table']) ? $args['table'] : null;
-            $data = StoreService::instance()->catalog($table);
-            return $res->write(JsonHelper::success($data));
-        })->add(new VerifyToken);
+        $app->get('/profilo/{id_utenza:\d}', function ($req, $res, $args) {
 
-        /**
-         *
-         */
-        $app->get('/profilo/corrente', function ($req, $res, $args) {
-            $utenzaId = $args['id_utenza_corrente'];
-            return $res->write(JsonHelper::success(StoreService::instance()->getProfile($utenzaId)));
-        })->add(new VerifyToken);
+            $incsQuery = $req->getQueryParams()['include'];
+            $idUtenza = $args['id_utenza'];
 
-        /**
-         *
-         */
-        $app->get('/profilo/{id_utenza:\d+}', function ($req, $res, $args) {
-            $result = StoreService::instance()->getProfile($args['id_utenza']);
+            $result = Store::getProfilo($idUtenza, $incsQuery);
 
-            if (!$result)
-                return $res
-                    ->withStatus(404)
-                    ->write(JsonHelper::fail('Utenza inesistente.'));
-
-            return $res->write(JsonHelper::success($result));
+            $res->write(JsonHelper::success($result));
         })
-        ->add(new setACL)
+        ->add(new SetACL)
+        ->add(new VerifyToken);
+
+        /**
+         *
+         */
+        $app->get('/profilo/me', function ($req, $res, $args) {
+
+            $incsQuery = $req->getQueryParams()['include'];
+            $idUtenza = $args['_id_utenza'];
+
+            $result = Store::getProfilo($idUtenza, $incsQuery);
+
+            $res->write(JsonHelper::success($result));
+        })
         ->add(new VerifyToken);
 
         /**
@@ -143,22 +142,22 @@ $app->group('/api', function () use ($app) {
 
             $queryParams = $req->getQueryParams();
 
-            $numero_contatore = $args['numero_contatore'];
+            $numeroContatore = $args['numero_contatore'];
             $metrica = $args['metrica'];
             $canale = isset($args['canale']) ? $args['canale'] : 1;
 
-            $data = StoreService::instance()->getSensoreDataByNumeroContatore($numero_contatore, $metrica, $canale, $queryParams);
+            $result = Store::getSensoreDataByNumeroContatore($numeroContatore, $metrica, $canale, $queryParams);
 
-            if (false === $data)
+            if (!$result)
                 return $res
                     ->withStatus(404)
                     ->write(JsonHelper::fail('Impossibile recuperare le informazioni dal sensore.'));
 
-            return $res->write(JsonHelper::success($data));
+            return $res->write(JsonHelper::success($result));
         })
         ->add(new SetACL)
         ->add(new VerifyToken);
-    } );
-} );
+    });
+});
 
 $app->run();
