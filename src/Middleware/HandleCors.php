@@ -1,6 +1,6 @@
 <?php
 
-namespace Sideco\Middleware;
+namespace sideco\middleware;
 
 class HandleCors {
     public function __invoke($req, $res, $next) {
