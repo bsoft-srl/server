@@ -1,5 +1,5 @@
 <?php
-namespace Sideco;
+namespace sideco;
 
 use \sideco\Store;
 use \sideco\middleware\HandleCors;
@@ -78,9 +78,16 @@ $app->group('/api', function () use ($app) {
          *
          */
         $app->get('/catalog[/{table}]', function ($req, $res, $args) {
+
             $table = isset($args['table']) ? $args['table'] : null;
-            $data = Store::catalog($table);
-            return $res->write(JsonHelper::success($data));
+            $result = Store::catalog($table);
+
+            if (!$result)
+                return $res
+                    ->withStatus(404)
+                    ->write(JsonHelper::fail('Tabella inesistente.'));
+
+            return $res->write(JsonHelper::success($result));
         });
 
         /**
@@ -107,8 +114,10 @@ $app->group('/api', function () use ($app) {
          */
         $app->get('/profilo/{id_utenza:\d}', function ($req, $res, $args) {
 
-            $incsQuery = $req->getQueryParams()['include'];
             $idUtenza = $args['id_utenza'];
+
+            $queryParams = $req->getQueryParams();
+            $incsQuery = isset($queryParams['include']) ? $queryParams['include'] : '';
 
             $result = Store::getProfilo($idUtenza, $incsQuery);
 
@@ -122,7 +131,9 @@ $app->group('/api', function () use ($app) {
          */
         $app->get('/profilo/me', function ($req, $res, $args) {
 
-            $incsQuery = $req->getQueryParams()['include'];
+            $queryParams = $req->getQueryParams();
+            $incsQuery = isset($queryParams['include']) ? $queryParams['include'] : '';
+
             $idUtenza = $args['_id_utenza'];
 
             $result = Store::getProfilo($idUtenza, $incsQuery);
@@ -157,6 +168,24 @@ $app->group('/api', function () use ($app) {
         })
         ->add(new SetACL)
         ->add(new VerifyToken);
+
+        /**
+         *
+         */
+        $app->get('/meteo', function ($req, $res) {
+
+            $queryParams = $req->getQueryParams();
+            $incsQuery = isset($queryParams['include']) ? $queryParams['include'] : '';
+
+            $result = Store::getMeteo($incsQuery);
+
+            if (!$result)
+                return $res
+                    ->withStatus(404)
+                    ->write(JsonHelper::fail('Impossibile recuperare le informazioni meteo.'));
+
+            return $res->write(JsonHelper::success($result));
+        });
     });
 });
 

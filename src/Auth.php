@@ -22,9 +22,11 @@ class Auth
             LIMIT 1
             ';
 
+        $hash = md5($password);
+
         $sth = DB::instance()->prepare($q);
             $sth->bindParam(':codice_fiscale', $codiceFiscale);
-            $sth->bindParam(':password', md5($password));
+            $sth->bindParam(':password', $hash);
         $sth->execute();
 
         $result = $sth->fetch();

@@ -9,10 +9,10 @@ class Store {
     /**
      *
      */
-    public function catalog($table = null)
+    public static function catalog($table = null)
     {
-
         if (is_null($table)) {
+
             $q =
                 "
                 SELECT *
@@ -21,6 +21,7 @@ class Store {
                 ";
 
             $sth = DB::instance()->query($q);
+
         } else {
 
             // Sanitizzo il nome della tabella
@@ -51,7 +52,8 @@ class Store {
     /**
      *
      */
-    public static function getUtenzaById($id) {
+    public static function getUtenzaById($id)
+    {
         $q =
             '
             SELECT u.*
@@ -70,7 +72,8 @@ class Store {
     /**
      *
      */
-    public function getNumeroContatoriByIdUtenza($id) {
+    public static function getNumeroContatoriByIdUtenza($id)
+    {
         $q =
             '
             SELECT DISTINCT ON (ui.num_contatore_elettrico)
@@ -96,7 +99,8 @@ class Store {
     /**
      *
      */
-    public static function getEdificiByIdUtenza($id) {
+    public static function getEdificiByIdUtenza($id)
+    {
         $q =
             '
             SELECT e.*
@@ -126,7 +130,8 @@ class Store {
     /**
      *
      */
-    public static function getUnitaUmmobiliariByIdUtenza($id) {
+    public static function getUnitaUmmobiliariByIdUtenza($id)
+    {
         $q =
             '
             SELECT ui.*
@@ -152,7 +157,8 @@ class Store {
     /**
      *
      */
-    public static function getDispositiviElettriciByIdUtenza($id) {
+    public static function getDispositiviElettriciByIdUtenza($id)
+    {
         $q =
             '
             SELECT d.*
@@ -182,7 +188,8 @@ class Store {
     /**
      *
      */
-    public static function getConsumiElettriciByIdUtenza($id) {
+    public static function getConsumiElettriciByIdUtenza($id)
+    {
         $q =
             '
             SELECT c.*
@@ -209,7 +216,8 @@ class Store {
     /**
      *
      */
-    public static function getConsumiGasByIdUtenza($id) {
+    public static function getConsumiGasByIdUtenza($id)
+    {
         $q =
             '
             SELECT c.*
@@ -235,7 +243,8 @@ class Store {
     /**
      *
      */
-    public static function getSensoriByIdUtenza($id) {
+    public static function getSensoriByIdUtenza($id)
+    {
         $q =
             '
             SELECT s.*
@@ -263,7 +272,8 @@ class Store {
     /**
      *
      */
-    public static function getZoneByIdUtente($id) {
+    public static function getZoneByIdUtente($id)
+    {
         $q =
             '
             SELECT z.*
@@ -293,7 +303,8 @@ class Store {
     /**
      *
      */
-    public static function getIlluminazioneByIdUtente($id) {
+    public static function getIlluminazioneByIdUtente($id)
+    {
         $q =
             '
             SELECT i.*
@@ -325,7 +336,8 @@ class Store {
     /**
      *
      */
-    private static function withUtenza($id, array &$data) {
+    private static function withUtenza($id, array &$data)
+    {
 
         $row = self::getUtenzaById($id);
 
@@ -339,7 +351,8 @@ class Store {
     /**
      *
      */
-    private static function withEdifici($id, array &$data) {
+    private static function withEdifici($id, array &$data)
+    {
 
         $destinazioneUso = [
             0 => 'civile abitazione',
@@ -367,7 +380,7 @@ class Store {
                 'superficie_totale_mq' => $row['superficie_totale_mq'],
                 'volume_totale_mc' => $row['volume_totale_mc'],
                 'numero_piani' => $row['numero_piani'],
-                'numero_piani_interrati' => $row['numero_piani_interrati'],
+                'numero_piani_interrati' => $row['numero_piani_interr'],
                 'consumi_annuali' => [
                     'gasolio_lt' => $row['consumi_gasolio_litri_anno'],
                     'gas_mc' => $row['consumi_gas_mc_anno'],
@@ -386,7 +399,8 @@ class Store {
     /**
      *
      */
-    private static function withUnitaImmobiliare($id, array &$data) {
+    private static function withUnitaImmobiliare($id, array &$data)
+    {
 
         $tipologia = [
             0 => 'residenziale',
@@ -418,7 +432,8 @@ class Store {
     /**
      *
      */
-    private static function withZone($id, array &$data) {
+    private static function withZone($id, array &$data)
+    {
 
         $tipologiaVetroInfissi = [
             0 => 'vetro singolo',
@@ -455,7 +470,8 @@ class Store {
     /**
      *
      */
-    private static function withIlluminazione($id, &$data) {
+    private static function withIlluminazione($id, &$data)
+    {
         foreach (self::getIlluminazioneByIdUtente($id) as $row) {
             $data['illuminazione'][$row['id_zona']][] = $row;
         }
@@ -464,7 +480,8 @@ class Store {
     /**
      *
      */
-    private static function withDispositiviElettrici($id, array &$data) {
+    private static function withDispositiviElettrici($id, array &$data)
+    {
 
         $tipologia = [
              0 => 'congelatore verticale',
@@ -501,7 +518,8 @@ class Store {
     /**
      *
      */
-    private static function withSensori($id, array &$data) {
+    private static function withSensori($id, array &$data)
+    {
 
         $tipologia = [
             0 => 'energia_elettrica',
@@ -527,7 +545,8 @@ class Store {
     /**
      *
      */
-    private static function withConsumi($id, array &$data) {
+    private static function withConsumi($id, array &$data)
+    {
 
         foreach (self::getConsumiElettriciByIdUtenza($id) as $row) {
             $data['consumi']['elettrici'][] = [
@@ -552,7 +571,8 @@ class Store {
     /**
      *
      */
-    public static function getProfilo($id, $incsQuery = '') {
+    public static function getProfilo($id, $incsQuery = '')
+    {
 
         $incs = [];
         $data = [];
@@ -589,7 +609,8 @@ class Store {
     /**
      *
      */
-     private static function prepareOpenTSDBQueryString(array $args = array()) {
+     private static function prepareOpenTSDBQueryString(array $args = array())
+     {
 
          $defaults = [
              'start' => '1h-ago',
@@ -647,5 +668,101 @@ class Store {
          $data = @file_get_contents($url);
 
          return $data ? json_decode($data) : false;
+     }
+
+     /**
+      *
+      */
+     private static function getMeteoNomeCondizione($icona)
+     {
+         $condizioni = [
+             '01' => 'clear sky',
+             '02' => 'few clouds',
+             '03' => 'scattered clouds',
+             '04' => 'broken clouds',
+             '09' => 'shower rain',
+             '10' => 'rain',
+             '11' => 'thunderstorm',
+             '13' => 'snow',
+             '50' => 'mist'
+         ];
+
+         return $condizioni[preg_replace('|[^\d]+|', '', $icona)];
+     }
+
+     /**
+      *
+      */
+     private static function withWeather(&$data)
+     {
+         $url = 'http://api.openweathermap.org/data/2.5/weather?id=6541869&units=metric&APPID=' . Config::OWM_APPID;
+
+         $result = @file_get_contents($url);
+
+         if (!$result) return false;
+
+         $result = json_decode($result, true);
+
+         $data['attuale'] = [
+             'data' => date('j/n/Y H:i', $result['dt']),
+             'condizione' => self::getMeteoNomeCondizione($result['weather'][0]['icon']),
+             'temperatura' => ceil($result['main']['temp']),
+             'umidita_pct' => $result['main']['humidity'],
+             'nuvole_pct' => $result['clouds']['all'],
+             'vento' => [
+                 'velocita_km_h' => ceil($result['wind']['speed'] * 3.6), // converto i m/s in Km/h
+                 'direzione_deg' => ceil($result['wind']['deg'])
+             ]
+         ];
+     }
+
+     /**
+      *
+      */
+     private static function withForecast(&$data)
+     {
+         $url = 'http://api.openweathermap.org/data/2.5/forecast/daily?id=6541869&cnt=16&units=metric&APPID=' . Config::OWM_APPID;
+
+         $result = @file_get_contents($url);
+
+         if (!$result) return false;
+
+         $result = json_decode($result, true);
+
+         foreach ($result['list'] as $row) {
+             $data['previsioni'][] = [
+                 'data' => date('j/n/Y H:i', $row['dt']),
+                 'condizione' => self::getMeteoNomeCondizione($row['weather'][0]['icon']),
+                 'temperature' => [
+                     'min' => ceil($row['temp']['min']),
+                     'max' => ceil($row['temp']['max'])
+                 ],
+                 'umidita_pct' => $row['humidity'],
+                 'nuvole_pct' => $row['clouds'],
+                 'vento' => [
+                     'velocita_km_h' => ceil($row['speed'] * 3.6),
+                     'direzione_deg' => ceil($row['deg'])
+                 ]
+             ];
+         }
+     }
+
+     /**
+      *
+      */
+     public static function getMeteo($incsQuery = '')
+     {
+         $incs = [];
+         $data = [];
+
+         if ($incsQuery) $incs = explode(',', $incsQuery);
+
+         if (in_array('w', $incs))
+            self::withWeather($data);
+
+         if (in_array('f', $incs))
+            self::withForecast($data);
+
+         return $data;
      }
 }

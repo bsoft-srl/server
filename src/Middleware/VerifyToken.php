@@ -37,7 +37,7 @@ class VerifyToken
         }
 
         /*
-         * Se il token è corretto, verifico che il payload id
+         * Se il token è corretto, verifico che il payload id_utenza
          * faccia riferimento ad un utente realmente esistente
          */
         $result = Store::getUtenzaById($token->id_utenza);

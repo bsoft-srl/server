@@ -29,7 +29,7 @@ class SetACL
 
         /*
          * Per verificare che la risorsa richiesta afferisca all'utenza corrente
-         * è indispensabile conoscere l'id_utenza_corrente,
+         * è indispensabile conoscere l'_id_utenza corrente,
          * argomento creato a seguito della chiamata al middleware VerifyToken
          */
         if (!isset($args['_id_utenza']))
@@ -74,9 +74,9 @@ class SetACL
                 $args['_tipologia'],
                 $this->allowed
             )
-        ) { $trust = true; }
+        ) { $trusted = true; }
 
-        if (!$trust)
+        if (!$trusted)
             return $res
                 ->withStatus(401)
                 ->write(JsonHelper::fail('Non possiedi i permessi per completare l\'operazione.'));
