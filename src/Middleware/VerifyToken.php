@@ -1,10 +1,10 @@
 <?php
-namespace Sideco\Middleware;
+namespace sideco\middleware;
 
-use \Sideco\Config;
-use \Sideco\AuthService;
-use \Sideco\StoreService;
-use \Sideco\JsonHelper;
+use \sideco\Config;
+use \sideco\Auth;
+use \sideco\Store;
+use \sideco\JsonHelper;
 
 /**
  * @author Federico Bassi <effe@dupl.it>
@@ -13,7 +13,7 @@ class VerifyToken
 {
     public function __invoke($req, $res, $next)
     {
-        $token = AuthService::instance()->getToken($req);
+        $token = Auth::getToken($req);
 
         /*
          * Il token può essere false in una delle seguenti circostanze
@@ -28,7 +28,7 @@ class VerifyToken
         /*
          * Verifico che il token sia del tipo atteso
          */
-        $payloadAtteso = ['id_utenza', 'tipologia_utenza'];
+        $payloadAtteso = ['id_utenza', 'tipologia'];
         foreach ($payloadAtteso as $k) {
             if (!isset($token->$k))
                 return $res
@@ -40,7 +40,7 @@ class VerifyToken
          * Se il token è corretto, verifico che il payload id_utenza
          * faccia riferimento ad un utente realmente esistente
          */
-        $result = StoreService::instance()->getUtenza($token->id_utenza);
+        $result = Store::getUtenzaById($token->id_utenza);
 
         if (!$result)
             return $res
@@ -51,8 +51,8 @@ class VerifyToken
          * Imposto gli argomenti dell'utenza corrente
          */
         $route = $req->getAttributes()['route'];
-        $route->setArgument('id_utenza_corrente', (string)$result->id_utenza);
-        $route->setArgument('tipologia_utenza_corrente', $result->tipologia);
+        $route->setArgument('_id_utenza', (string)$result['id']);
+        $route->setArgument('_tipologia', $result['tipologia']);
 
         return $next($req, $res);
     }

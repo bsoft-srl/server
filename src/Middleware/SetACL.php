@@ -1,9 +1,8 @@
 <?php
-namespace Sideco\Middleware;
+namespace sideco\middleware;
 
-use \Sideco\AuthService;
-use \Sideco\StoreService;
-use \Sideco\JsonHelper;
+use \sideco\Store;
+use \sideco\JsonHelper;
 
 
 class SetACL
@@ -30,10 +29,10 @@ class SetACL
 
         /*
          * Per verificare che la risorsa richiesta afferisca all'utenza corrente
-         * è indispensabile conoscere l'id_utenza_corrente,
+         * è indispensabile conoscere l'_id_utenza corrente,
          * argomento creato a seguito della chiamata al middleware VerifyToken
          */
-        if (!isset($args['id_utenza_corrente']))
+        if (!isset($args['_id_utenza']))
             return $res
                 ->withStatus(403)
                 ->write(JsonHelper::fail('Impossibile verificare i permessi.'));
@@ -44,7 +43,7 @@ class SetACL
          */
         if (
             isset($args['id_utenza']) &&
-            $args['id_utenza'] == $args['id_utenza_corrente']
+            $args['id_utenza'] == $args['_id_utenza']
         ) { $trusted = true; }
 
         /*
@@ -55,13 +54,13 @@ class SetACL
             isset($args['numero_contatore']) &&
             in_array(
                 $args['numero_contatore'],
-                StoreService::instance()->getNumeroContatoriByUtenza($args['id_utenza_corrente'])
+                Store::getNumeroContatoriByIdUtenza($args['_id_utenza'])
                 )
         ) { $trusted = true; }
 
         // Se sono il proprietario posso accedere alla risorsa
         if ($trusted) {
-            $route->setArgument('is_owner', true);
+            $route->setArgument('_proprietario', true);
             return $next($req, $res);
         }
 
@@ -72,18 +71,17 @@ class SetACL
          */
         if (
             in_array(
-                $args['tipologia_utenza_corrente'],
+                $args['_tipologia'],
                 $this->allowed
             )
-        ) { $trust = true; }
+        ) { $trusted = true; }
 
-
-        if (!$trust)
+        if (!$trusted)
             return $res
                 ->withStatus(401)
                 ->write(JsonHelper::fail('Non possiedi i permessi per completare l\'operazione.'));
 
-        $route->setArgument('is_owner', false);
+        $route->setArgument('_proprietario', false);
         return $next($req, $res);
     }
 }

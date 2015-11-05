@@ -6,7 +6,7 @@ define('ROOT_PATH', __DIR__ . '/../');
 require_once ROOT_PATH . '/vendor/autoload.php';
 
 spl_autoload_register(function ($class) {
-    $prefix = 'Sideco\\';
+    $prefix = 'sideco\\';
     $base_dir = ROOT_PATH . '/src/';
 
     $len = strlen($prefix);
