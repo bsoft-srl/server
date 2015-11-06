@@ -673,18 +673,18 @@ class Store {
      /**
       *
       */
-     private static function getMeteoNomeCondizione($icona)
+     private static function getMeteoNomeIcona($icona)
      {
          $condizioni = [
-             '01' => 'clear sky',
-             '02' => 'few clouds',
-             '03' => 'scattered clouds',
-             '04' => 'broken clouds',
-             '09' => 'shower rain',
+             '01' => 'day-sunny', //'clear sky',
+             '02' => 'cloudy', //'few clouds',
+             '03' => 'cloudy', //'scattered clouds',
+             '04' => 'cloud', //'broken clouds',
+             '09' => 'shower', //'shower rain',
              '10' => 'rain',
              '11' => 'thunderstorm',
              '13' => 'snow',
-             '50' => 'mist'
+             '50' => 'dust', //'mist'
          ];
 
          return $condizioni[preg_replace('|[^\d]+|', '', $icona)];
@@ -704,8 +704,8 @@ class Store {
          $result = json_decode($result, true);
 
          $data['attuale'] = [
-             'data' => date('j/n/Y H:i', $result['dt']),
-             'condizione' => self::getMeteoNomeCondizione($result['weather'][0]['icon']),
+             'data' => date('j M Y', $result['dt']),
+             'icona' => self::getMeteoNomeIcona($result['weather'][0]['icon']),
              'temperatura' => ceil($result['main']['temp']),
              'umidita_pct' => $result['main']['humidity'],
              'nuvole_pct' => $result['clouds']['all'],
@@ -731,8 +731,8 @@ class Store {
 
          foreach ($result['list'] as $row) {
              $data['previsioni'][] = [
-                 'data' => date('j/n/Y H:i', $row['dt']),
-                 'condizione' => self::getMeteoNomeCondizione($row['weather'][0]['icon']),
+                 'data' => date('j M Y', $row['dt']),
+                 'icona' => self::getMeteoNomeIcona($row['weather'][0]['icon']),
                  'temperature' => [
                      'min' => ceil($row['temp']['min']),
                      'max' => ceil($row['temp']['max'])
