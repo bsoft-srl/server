@@ -369,6 +369,7 @@ class Store {
                 'parent' => [
                     'id_utenza' => $id
                 ],
+                'parent_id' => $id,
                 'denominazione' => $row['denominazione'],
                 'indirizzo' => $row['indirizzo'],
                 'civico' => $row['civico'],
@@ -416,6 +417,7 @@ class Store {
                 'parent' => [
                     'id_edificio' => $row['id_edificio']
                 ],
+                'parent_id' => (string)$row['id_edificio'],
                 'tipologia' => $tipologia[$row['tipo']],
                 'consumi_annuali' => [
                     'elettrici_kwh' => $row['consumi_elettrici_kwh_anno'],
@@ -532,6 +534,7 @@ class Store {
                 'parent' => [
                     'id_unita_immobiliare' => (string)$row['numero_contatore']
                 ],
+                'parent_id' => (string)$row['numero_contatore'],
                 'mac_address' => $row['mac'],
                 'mac_address_datalogger' => $row['mac_datalogger'],
                 'numero_canali' => $row['numero_canali'],
@@ -704,7 +707,7 @@ class Store {
          $result = json_decode($result, true);
 
          $data['attuale'] = [
-             'data' => date('j M Y', $result['dt']),
+             'data' => date('j M Y H:m', $result['dt']),
              'icona' => self::getMeteoNomeIcona($result['weather'][0]['icon']),
              'temperatura' => ceil($result['main']['temp']),
              'umidita_pct' => $result['main']['humidity'],

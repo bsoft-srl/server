@@ -6,7 +6,7 @@ class JsonHelper {
     public static function success($data, $encode = true) {
         $retval = [
             'success' => true,
-            'data' => $data
+            'payload' => $data
         ];
 
         return $encode ? json_encode($retval) : $retval;
