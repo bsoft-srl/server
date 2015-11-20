@@ -392,7 +392,8 @@ class Store {
                 'tipologia_climatizzazione_estiva' => $row['tipologia_climatizzazione_estiva'],
                 'potenza_disponibile_w' => $row['potenza_disponibile'],
                 'destinazione_uso' => $destinazioneUso[$row['destinazione_uso']],
-                'note' => $row['note']
+                'note' => $row['note'],
+                'latLon' => self::getLatLon(strtoupper($row['indirizzo']), $row['civico'])
             ];
         }
     }
@@ -459,6 +460,7 @@ class Store {
                 'parent' => [
                     'id_unita_immobiliare' => (string)$row['id_unita']
                 ],
+                'parent_id' => (string)$row['id_unita'],
                 'tipologia' => $row['tipo'],
                 'superficie_mq' => $row['superficie_mq'],
                 'infissi' => [
@@ -509,6 +511,7 @@ class Store {
                 'parent' => [
                     'id_unita_immobiliare' => $row['id_unita']
                 ],
+                'parent_id' => $row['id_unita'],
                 'tipologia' => $tipologia[$row['tipo']],
                 'conteggio' => $row['numero'],
                 'potenza_nominale_w' => $row['potenza_nominale'],
@@ -570,6 +573,80 @@ class Store {
         }
     }
 
+    /**
+     *
+     */
+    public static function getGeoJson($featureType)
+    {
+        $q =
+            '
+            SELECT ST_AsGeoJSON(ST_Transform(geom, 4326)) json
+            FROM %s
+            ';
+
+        // Sanitizzo il nome della tabella
+        $q = sprintf($q, preg_replace('|[^a-z_]*|i', '', $featureType));
+
+        $sth = DB::instance()->prepare($q);
+        $sth->execute();
+
+        $result = [];
+        while ($row = $sth->fetch()) {
+            $result[] = json_decode($row['json']);
+        }
+
+        return $result;
+    }
+
+    /**
+     *
+     */
+    private static function withGeoJson($featureType, array &$data)
+    {
+        if (!isset($data['geo'])) $data['geo'] = [];
+
+        foreach (self::getGeoJson($featureType) as $row) {
+            $data['geo'][$featureType][] = $row;
+        }
+    }
+
+    /**
+     *
+     */
+    private static function getLatLon($indirizzo, $civico)
+    {
+        $q =
+            '
+            SELECT ST_AsGeoJSON(ST_Transform(geom, 4326)) json
+            FROM civici c
+            WHERE indir LIKE :indirizzo
+                AND civ = :civico LIMIT 1
+            ';
+
+        $indirizzo = "%{$indirizzo}%";
+
+        $sth = DB::instance()->prepare($q);
+        $sth->bindParam(':indirizzo', $indirizzo);
+        $sth->bindParam(':civico', $civico, \PDO::PARAM_INT);
+        $sth->execute();
+
+        /** */
+        $latLon = [0,0];
+
+        $row = $sth->fetch();
+
+        if (isset($row['json'])) {
+            $row = json_decode($row['json']);
+
+            if (isset($row->coordinates[0])) {
+                $row = $row->coordinates[0];
+
+                $latLon = [$row[1], $row[0]];
+            }
+        }
+
+        return $latLon;
+    }
 
     /**
      *
@@ -605,6 +682,13 @@ class Store {
 
         if (in_array('c', $incs))
             self::withConsumi($id, $data);
+
+        /** */
+        self::withGeoJson('perimetro_quartiere', $data);
+        self::withGeoJson('pubblico', $data);
+        self::withGeoJson('privato', $data);
+        self::withGeoJson('commerciale', $data);
+        self::withGeoJson('grafo_viario', $data);
 
         return $data;
     }
