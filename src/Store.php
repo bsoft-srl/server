@@ -216,6 +216,61 @@ class Store {
     /**
      *
      */
+    public static function getConsumiGasByNumeroContatore($numeroContatore)
+    {
+        $q =
+            '
+            SELECT *
+            FROM
+                gas_rilevamenti c,
+                dati_utenze_monitorate u
+            WHERE c.cf_titolare = u.codice_fiscale
+                AND u.numero_contatore = :numero_contatore
+            ';
+
+        $sth = DB::instance()->prepare($q);
+        $sth->bindParam(':numero_contatore', $numeroContatore, \PDO::PARAM_INT);
+        $sth->execute();
+
+        $result = [];
+        while ($row = $sth->fetch()) {
+            $result[] = $row;
+        }
+
+        return $result;
+    }
+
+    /**
+     *
+     */
+    public static function getConsumiElettriciByNumeroContatore($numeroContatore)
+    {
+        $q =
+            '
+            SELECT *
+            FROM
+                dati_fornitura_rilevamenti c,
+                dati_utenze_monitorate u
+            WHERE c.cf_titolare = u.codice_fiscale
+                AND u.numero_contatore = :numero_contatore
+                AND c.tipologia = \'E\'
+            ';
+
+        $sth = DB::instance()->prepare($q);
+        $sth->bindParam(':numero_contatore', $numeroContatore, \PDO::PARAM_INT);
+        $sth->execute();
+
+        $result = [];
+        while ($row = $sth->fetch()) {
+            $result[] = $row;
+        }
+
+        return $result;
+    }
+
+    /**
+     *
+     */
     public static function getConsumiGasByIdUtenza($id)
     {
         $q =
@@ -255,6 +310,7 @@ class Store {
             WHERE u.id = :id
                 AND u.codice_fiscale = um.codice_fiscale
                 AND um.numero_contatore = s.numero_contatore
+                AND s.manutenzione = false
             ';
 
         $sth = DB::instance()->prepare($q);
@@ -413,6 +469,10 @@ class Store {
         ];
 
         foreach (self::getUnitaUmmobiliariByIdUtenza($id) as $row) {
+
+            $consumi = [];
+            self::_withConsumi($row['num_contatore_elettrico'], $consumi);
+
             $data['unita_immobiliari'][] = [
                 'id' => (string)$row['num_contatore_elettrico'],
                 'parent' => [
@@ -427,7 +487,8 @@ class Store {
                 ],
                 'subalterno' => $row['subalterno'],
                 'potenza_disponibile_w' => $row['potenza_disponibile'],
-                'note' => $row['note']
+                'note' => $row['note'],
+                'consumi' => $consumi
             ];
         }
     }
@@ -527,9 +588,18 @@ class Store {
     {
 
         $tipologia = [
-            0 => 'energia_elettrica',
-            1 => 'misuratore ad impulsi generico',
-            2 => 'ambientale'
+            0 => [
+                'energia_elettrica',
+                'Misuratore contatore elettrico'
+            ],
+            1 => [
+                'generico',
+                'Misuratore ad impulsi generico'
+            ],
+            2 => [
+                'ambientale',
+                'Misuratore ambientale'
+            ]
         ];
 
         foreach (self::getSensoriByIdUtenza($id) as $row) {
@@ -541,7 +611,8 @@ class Store {
                 'mac_address' => $row['mac'],
                 'mac_address_datalogger' => $row['mac_datalogger'],
                 'numero_canali' => $row['numero_canali'],
-                'tipologia' => $tipologia[$row['tipologia']],
+                'tipologia' => $tipologia[$row['tipologia']][0],
+                'tipologia_desc' => $tipologia[$row['tipologia']][1],
                 'in_manutenzione' => $row['manutenzione'],
                 'ultimo_aggiornamento' => $row['lastupdate']
             ];
@@ -565,6 +636,30 @@ class Store {
 
         foreach (self::getConsumiGasByIdUtenza($id) as $row) {
             $data['consumi']['gas'][] = [
+                'anno' => $row['anno'],
+                'numero_mesi_fatturati' => $row['num_mesi_fatturati'],
+                'ammontare_netto_iva' => $row['ammontare_fatturato'],
+                'mc_fatturati' => $row['consumo_fatturato']
+            ];
+        }
+    }
+
+    /**
+     *
+     */
+    private static function _withConsumi($numeroContatore, array &$data)
+    {
+        foreach (self::getConsumiElettriciByNumeroContatore($numeroContatore) as $row) {
+            $data['elettrici'][] = [
+                'anno' => $row['anno'],
+                'numero_mesi_fatturati' => $row['num_mesi_fatturazione'],
+                'ammontare_netto_iva' => $row['ammontare_netto_iva'],
+                'kw_fatturati' => $row['kw_fatturati']
+            ];
+        }
+
+        foreach (self::getConsumiGasByNumeroContatore($numeroContatore) as $row) {
+            $data['gas'][] = [
                 'anno' => $row['anno'],
                 'numero_mesi_fatturati' => $row['num_mesi_fatturati'],
                 'ammontare_netto_iva' => $row['ammontare_fatturato'],
@@ -605,8 +700,12 @@ class Store {
     {
         if (!isset($data['geo'])) $data['geo'] = [];
 
-        foreach (self::getGeoJson($featureType) as $row) {
-            $data['geo'][$featureType][] = $row;
+        foreach (self::getGeoJson($featureType) as $i => $row) {
+            $data['geo'][$featureType][] = [
+                'type' => 'Feature',
+                'geometry' => $row,
+                'id' => "{$featureType}.{$i}"
+            ];
         }
     }
 
@@ -651,7 +750,7 @@ class Store {
     /**
      *
      */
-    public static function getProfilo($id, $incsQuery = '')
+    public static function getProfilo($id, $tipologia, $incsQuery = '')
     {
 
         $incs = [];
@@ -680,15 +779,25 @@ class Store {
         if (in_array('s', $incs))
             self::withSensori($id, $data);
 
-        if (in_array('c', $incs))
+        /*if (in_array('c', $incs)) {
             self::withConsumi($id, $data);
+            self::_withConsumi($data['utenza'], $data);
+        }*/
+
 
         /** */
-        self::withGeoJson('perimetro_quartiere', $data);
-        self::withGeoJson('pubblico', $data);
-        self::withGeoJson('privato', $data);
-        self::withGeoJson('commerciale', $data);
-        self::withGeoJson('grafo_viario', $data);
+        if (in_array('g', $incs)) {
+            self::withGeoJson('perimetro_quartiere', $data);
+            self::withGeoJson('grafo_viario', $data);
+
+            if ($tipologia == 0)
+                self::withGeoJson('privato', $data);
+            else if ($tipologia == 1)
+                self::withGeoJson('pubblico', $data);
+            else if ($tipologia == 2)
+                self::withGeoJson('commerciale', $data);
+        }
+
 
         return $data;
     }
