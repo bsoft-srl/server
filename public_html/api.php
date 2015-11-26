@@ -115,11 +115,12 @@ $app->group('/api', function () use ($app) {
         $app->get('/profilo/{id_utenza:\d}', function ($req, $res, $args) {
 
             $idUtenza = $args['id_utenza'];
+            $tipologia = $args['_tipologia'];
 
             $queryParams = $req->getQueryParams();
             $incsQuery = isset($queryParams['include']) ? $queryParams['include'] : '';
 
-            $result = Store::getProfilo($idUtenza, $incsQuery);
+            $result = Store::getProfilo($idUtenza, $tipologia, $incsQuery);
 
             $res->write(JsonHelper::success($result));
         })
@@ -135,8 +136,9 @@ $app->group('/api', function () use ($app) {
             $incsQuery = isset($queryParams['include']) ? $queryParams['include'] : '';
 
             $idUtenza = $args['_id_utenza'];
+            $tipologia = $args['_tipologia'];
 
-            $result = Store::getProfilo($idUtenza, $incsQuery);
+            $result = Store::getProfilo($idUtenza, $tipologia, $incsQuery);
 
             $res->write(JsonHelper::success($result));
         })
