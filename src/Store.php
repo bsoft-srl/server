@@ -188,47 +188,31 @@ class Store {
     /**
      *
      */
-    public static function getConsumiElettriciByIdUtenza($id)
+    public static function getConsumiGasByNumeroContatoreAndCodiceFiscale($numeroContatore, $codiceFiscale)
     {
+        /**
+         * TODO: compilare la colonna c.nome_st
+         * in modo da restringere i risultati con AND c.nome_st = u.indirizzo
+         */
         $q =
             '
-            SELECT c.*
-            FROM
-                dati_fornitura_rilevamenti c,
-                utenze u
-            WHERE u.id = :id
-                AND c.cf_titolare = u.codice_fiscale
-                AND c.tipologia = \'E\'
-            ';
-
-        $sth = DB::instance()->prepare($q);
-        $sth->bindParam(':id', $id, \PDO::PARAM_INT);
-        $sth->execute();
-
-        $result = [];
-        while ($row = $sth->fetch()) {
-            $result[] = $row;
-        }
-
-        return $result;
-    }
-
-    /**
-     *
-     */
-    public static function getConsumiGasByNumeroContatore($numeroContatore)
-    {
-        $q =
-            '
-            SELECT *
+            SELECT
+                c.anno,
+                c.num_mesi_fatturati,
+                c.ammontare_fatturato,
+                c.consumo_fatturato
             FROM
                 gas_rilevamenti c,
                 dati_utenze_monitorate u
-            WHERE c.cf_titolare = u.codice_fiscale
+            WHERE c.cf_titolare LIKE :codice_fiscale
                 AND u.numero_contatore = :numero_contatore
+            ORDER BY c.anno ASC
             ';
 
+        $codiceFiscale = "%{$codiceFiscale}%";
+
         $sth = DB::instance()->prepare($q);
+        $sth->bindParam(':codice_fiscale', $codiceFiscale);
         $sth->bindParam(':numero_contatore', $numeroContatore, \PDO::PARAM_INT);
         $sth->execute();
 
@@ -243,48 +227,30 @@ class Store {
     /**
      *
      */
-    public static function getConsumiElettriciByNumeroContatore($numeroContatore)
+    public static function getConsumiElettriciByNumeroContatoreAndCodiceFiscale($numeroContatore, $codiceFiscale)
     {
         $q =
             '
-            SELECT *
+            SELECT
+                c.anno,
+                c.num_mesi_fatturazione,
+                c.ammontare_netto_iva,
+                c.kw_fatturati
             FROM
                 dati_fornitura_rilevamenti c,
                 dati_utenze_monitorate u
-            WHERE c.cf_titolare = u.codice_fiscale
+            WHERE c.cf_titolare LIKE :codice_fiscale
                 AND u.numero_contatore = :numero_contatore
+                AND c.nome_st = u.indirizzo
                 AND c.tipologia = \'E\'
+            ORDER BY c.anno ASC
             ';
 
+        $codiceFiscale = "%{$codiceFiscale}%";
+
         $sth = DB::instance()->prepare($q);
+        $sth->bindParam(':codice_fiscale', $codiceFiscale);
         $sth->bindParam(':numero_contatore', $numeroContatore, \PDO::PARAM_INT);
-        $sth->execute();
-
-        $result = [];
-        while ($row = $sth->fetch()) {
-            $result[] = $row;
-        }
-
-        return $result;
-    }
-
-    /**
-     *
-     */
-    public static function getConsumiGasByIdUtenza($id)
-    {
-        $q =
-            '
-            SELECT c.*
-            FROM
-                gas_rilevamenti c,
-                utenze u
-            WHERE u.id = :id
-                AND c.cf_titolare = u.codice_fiscale
-            ';
-
-        $sth = DB::instance()->prepare($q);
-        $sth->bindParam(':id', $id, \PDO::PARAM_INT);
         $sth->execute();
 
         $result = [];
@@ -457,7 +423,7 @@ class Store {
     /**
      *
      */
-    private static function withUnitaImmobiliare($id, array &$data)
+    private static function withUnitaImmobiliare($utenza, array &$data)
     {
 
         $tipologia = [
@@ -468,10 +434,10 @@ class Store {
             4 => 'impianti sportivi'
         ];
 
-        foreach (self::getUnitaUmmobiliariByIdUtenza($id) as $row) {
+        foreach (self::getUnitaUmmobiliariByIdUtenza($utenza['id']) as $row) {
 
             $consumi = [];
-            self::_withConsumi($row['num_contatore_elettrico'], $consumi);
+            self::withConsumi($utenza, $row['num_contatore_elettrico'], $consumi);
 
             $data['unita_immobiliari'][] = [
                 'id' => (string)$row['num_contatore_elettrico'],
@@ -599,6 +565,22 @@ class Store {
             2 => [
                 'ambientale',
                 'Misuratore ambientale'
+            ],
+            3 => [
+                'ambientale_out_2ch',
+                'Misuratore ambientale (2ch)'
+            ],
+            4 => [
+                'ambientale_out_3ch',
+                'Misuratore ambientale (3ch)'
+            ],
+            5 => [
+                'ambientale_out_meteo_3ch',
+                'Meteo'
+            ],
+            6 => [
+                'produzione',
+                'Fotovoltaico'
             ]
         ];
 
@@ -622,34 +604,9 @@ class Store {
     /**
      *
      */
-    private static function withConsumi($id, array &$data)
+    private static function withConsumi($utenza, $numeroContatore, array &$data)
     {
-
-        foreach (self::getConsumiElettriciByIdUtenza($id) as $row) {
-            $data['consumi']['elettrici'][] = [
-                'anno' => $row['anno'],
-                'numero_mesi_fatturati' => $row['num_mesi_fatturazione'],
-                'ammontare_netto_iva' => $row['ammontare_netto_iva'],
-                'kw_fatturati' => $row['kw_fatturati']
-            ];
-        }
-
-        foreach (self::getConsumiGasByIdUtenza($id) as $row) {
-            $data['consumi']['gas'][] = [
-                'anno' => $row['anno'],
-                'numero_mesi_fatturati' => $row['num_mesi_fatturati'],
-                'ammontare_netto_iva' => $row['ammontare_fatturato'],
-                'mc_fatturati' => $row['consumo_fatturato']
-            ];
-        }
-    }
-
-    /**
-     *
-     */
-    private static function _withConsumi($numeroContatore, array &$data)
-    {
-        foreach (self::getConsumiElettriciByNumeroContatore($numeroContatore) as $row) {
+        foreach (self::getConsumiElettriciByNumeroContatoreAndCodiceFiscale($numeroContatore, $utenza['codice_fiscale']) as $row) {
             $data['elettrici'][] = [
                 'anno' => $row['anno'],
                 'numero_mesi_fatturati' => $row['num_mesi_fatturazione'],
@@ -658,7 +615,7 @@ class Store {
             ];
         }
 
-        foreach (self::getConsumiGasByNumeroContatore($numeroContatore) as $row) {
+        foreach (self::getConsumiGasByNumeroContatoreAndCodiceFiscale($numeroContatore, $utenza['codice_fiscale']) as $row) {
             $data['gas'][] = [
                 'anno' => $row['anno'],
                 'numero_mesi_fatturati' => $row['num_mesi_fatturati'],
@@ -758,14 +715,15 @@ class Store {
 
         if ($incsQuery) $incs = explode(',', $incsQuery);
 
-        if (in_array('u', $incs))
-            self::withUtenza($id, $data);
+        /** */
+        self::withUtenza($id, $data);
 
+        /** */
         if (in_array('e', $incs))
             self::withEdifici($id, $data);
 
         if (in_array('ui', $incs))
-            self::withUnitaImmobiliare($id, $data);
+            self::withUnitaImmobiliare($data['utenza'], $data);
 
         if (in_array('z', $incs))
             self::withZone($id, $data);
@@ -778,12 +736,6 @@ class Store {
 
         if (in_array('s', $incs))
             self::withSensori($id, $data);
-
-        /*if (in_array('c', $incs)) {
-            self::withConsumi($id, $data);
-            self::_withConsumi($data['utenza'], $data);
-        }*/
-
 
         /** */
         if (in_array('g', $incs)) {
