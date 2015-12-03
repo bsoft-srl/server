@@ -503,8 +503,25 @@ class Store {
      */
     private static function withIlluminazione($id, &$data)
     {
+        $tipologia = [
+            0 => 'LED',
+            1 => 'Fluorescente',
+            2 => 'A scarica'
+        ];
+
         foreach (self::getIlluminazioneByIdUtente($id) as $row) {
-            $data['illuminazione'][$row['id_zona']][] = $row;
+            //$data['illuminazione'][$row['id_zona']][] = $row;
+
+            $data['illuminazione'][] = [
+                'id' => $row['id'],
+                'parent' => [
+                    'id_zona' => $row['id_zona']
+                ],
+                'parent_id' => $row['id_zona'],
+                'tipologia' => $row['tipologia'],
+                'quantita' => $row['quantita'],
+                'potenza_nominale_w' => $row['potenza_nominale']
+            ];
         }
     }
 
@@ -859,7 +876,7 @@ class Store {
              'nuvole_pct' => $result['clouds']['all'],
              'vento' => [
                  'velocita_km_h' => ceil($result['wind']['speed'] * 3.6), // converto i m/s in Km/h
-                 'direzione_deg' => ceil($result['wind']['deg'])
+                 //'direzione_deg' => ceil($result['wind']['deg'])
              ]
          ];
      }
