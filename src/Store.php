@@ -361,12 +361,19 @@ class Store {
     private static function withUtenza($id, array &$data)
     {
 
+        $tipologie = [
+            0 => 'privato',
+            1 => 'pubblico',
+            2 => 'commerciale'
+        ];
+
         $row = self::getUtenzaById($id);
 
         $data['utenza'] = [
             'id' => $row['id'],
             'codice_fiscale' => $row['codice_fiscale'],
-            'tipologia' => $row['tipologia']
+            'tipologia' => $row['tipologia'],
+            'tipologia_desc' => self::varVal($row['tipologia'], $tipologie, 'altro')
         ];
     }
 
@@ -392,28 +399,28 @@ class Store {
                     'id_utenza' => $id
                 ],
                 'parent_id' => $id,
-                'denominazione' => $row['denominazione'],
-                'indirizzo' => $row['indirizzo'],
+                'denominazione' => self::varVal('denominazione', $row),
+                'indirizzo' => self::varVal('indirizzo', $row),
                 'civico' => $row['civico'],
                 'foglio_catastale' => $row['foglio_catastale'],
                 'particella_catastale' => $row['particella_catastale'],
-                'anno_costruzione' => $row['anno_costr'],
-                'anno_ristrutturazione' => $row['anno_ristr'],
+                'anno_costruzione' => (string)$row['anno_costr'],
+                'anno_ristrutturazione' => (string)$row['anno_ristr'],
                 'utenze_giornaliere' => $row['num_utenti_giorno'],
-                'superficie_totale_mq' => $row['superficie_totale_mq'],
-                'volume_totale_mc' => $row['volume_totale_mc'],
+                'superficie_totale_mq' => self::parseFloat($row['superficie_totale_mq']),
+                'volume_totale_mc' => self::parseFloat($row['volume_totale_mc']),
                 'numero_piani' => $row['numero_piani'],
                 'numero_piani_interrati' => $row['numero_piani_interr'],
                 'consumi_annuali' => [
-                    'gasolio_lt' => $row['consumi_gasolio_litri_anno'],
-                    'gas_mc' => $row['consumi_gas_mc_anno'],
-                    'olio_lt' => $row['consumi_olio_litri_anno'],
-                    'gpl_lt' => $row['consumi_gpl_litri_anno']
+                    'gasolio_lt' => self::parseFloat($row['consumi_gasolio_litri_anno']),
+                    'gas_mc' => self::parseFloat($row['consumi_gas_mc_anno']),
+                    'olio_lt' => self::parseFloat($row['consumi_olio_litri_anno']),
+                    'gpl_lt' => self::parseFloat($row['consumi_gpl_litri_anno'])
                 ],
                 'tipologia_riscaldamento' => $row['tipologia_riscaldamento'],
                 'tipologia_climatizzazione_estiva' => $row['tipologia_climatizzazione_estiva'],
-                'potenza_disponibile_w' => $row['potenza_disponibile'],
-                'destinazione_uso' => $destinazioneUso[$row['destinazione_uso']],
+                'potenza_disponibile_w' => self::parseFloat($row['potenza_disponibile']),
+                'destinazione_uso' => self::varVal($row['destinazione_uso'], $destinazioneUso, 'altro'),
                 'note' => $row['note'],
                 'latLon' => self::getLatLon(strtoupper($row['indirizzo']), $row['civico'])
             ];
@@ -445,18 +452,26 @@ class Store {
                     'id_edificio' => $row['id_edificio']
                 ],
                 'parent_id' => (string)$row['id_edificio'],
-                'tipologia' => $tipologia[$row['tipo']],
+                'tipologia' => self::varVal($row['tipo'], $tipologia),
                 'consumi_annuali' => [
-                    'elettrici_kwh' => $row['consumi_elettrici_kwh_anno'],
-                    'idrici_mc' => $row['consumi_idrici_mc_anno'],
-                    'gas_mc' => $row['consumi_gas_mc_anno']
+                    'elettrici_kwh' => self::parseFloat($row['consumi_elettrici_kwh_anno']),
+                    'idrici_mc' => self::parseFloat($row['consumi_idrici_mc_anno']),
+                    'gas_mc' => self::parseFloat($row['consumi_gas_mc_anno'])
                 ],
                 'subalterno' => $row['subalterno'],
-                'potenza_disponibile_w' => $row['potenza_disponibile'],
+                'potenza_disponibile_w' => self::parseFloat($row['potenza_disponibile']),
                 'note' => $row['note'],
                 'consumi' => $consumi
             ];
         }
+    }
+
+    /**
+     *
+     */
+    private static function varVal($k, array $arr, $default = 'n/d')
+    {
+        return isset($arr[$k]) ? $arr[$k] : $default;
     }
 
     /**
@@ -488,11 +503,11 @@ class Store {
                     'id_unita_immobiliare' => (string)$row['id_unita']
                 ],
                 'parent_id' => (string)$row['id_unita'],
-                'tipologia' => $row['tipo'],
-                'superficie_mq' => $row['superficie_mq'],
+                'tipologia' => self::varVal('tipo', $row),
+                'superficie_mq' => self::parseFloat($row['superficie_mq']),
                 'infissi' => [
-                    'tipologia_vetro' => $tipologiaVetroInfissi[$row['infissi_tipologia_vetro']],
-                    'tipologia_telaio' => $tipologiaTelaioInfissi[$row['infissi_tipologia_telaio']]
+                    'tipologia_vetro' => self::varVal($row['infissi_tipologia_vetro'], $tipologiaVetroInfissi),
+                    'tipologia_telaio' => self::varVal($row['infissi_tipologia_telaio'], $tipologiaTelaioInfissi)
                 ]
             ];
         }
@@ -510,19 +525,29 @@ class Store {
         ];
 
         foreach (self::getIlluminazioneByIdUtente($id) as $row) {
-            //$data['illuminazione'][$row['id_zona']][] = $row;
-
             $data['illuminazione'][] = [
                 'id' => $row['id'],
                 'parent' => [
                     'id_zona' => $row['id_zona']
                 ],
                 'parent_id' => $row['id_zona'],
-                'tipologia' => $row['tipologia'],
+                'tipologia' => self::varVal($row['tipologia'], $tipologia),
                 'quantita' => $row['quantita'],
-                'potenza_nominale_w' => $row['potenza_nominale']
+                'potenza_nominale_w' => self::parseFloat($row['potenza_nominale'])
             ];
         }
+    }
+
+    /**
+     *
+     */
+    private static function parseFloat($str) {
+        if (strstr($str, ',')) {
+            $str = str_replace('.', '', $str);
+            $str = str_replace(',', '.', $str);
+        }
+
+        return floatval($str);
     }
 
     /**
@@ -545,21 +570,20 @@ class Store {
             10 => 'personal computer',
             11 => 'stampante',
             12 => 'tostapane',
-            13 => 'forno a microonde',
-            14 => 'altro'
+            13 => 'forno a microonde'
         ];
 
         foreach (self::getDispositiviElettriciByIdUtenza($id) as $row) {
             $data['dispositivi_elettrici'][] = [
                 'id' => $row['id'],
                 'parent' => [
-                    'id_unita_immobiliare' => $row['id_unita']
+                    'id_unita_immobiliare' => (string)$row['id_unita']
                 ],
-                'parent_id' => $row['id_unita'],
-                'tipologia' => $tipologia[$row['tipo']],
+                'parent_id' => (string)$row['id_unita'],
+                'tipologia' => self::varVal($row['tipo'], $tipologia, 'altro'),
                 'conteggio' => $row['numero'],
-                'potenza_nominale_w' => $row['potenza_nominale'],
-                'modalita_utilizzo_h_g' => $row['modalita_utilizzo_h_g']
+                'potenza_nominale_w' => self::parseFloat($row['potenza_nominale']),
+                'modalita_utilizzo_h_g' => self::parseFloat($row['modalita_utilizzo_h_g'])
             ];
         }
     }
@@ -602,6 +626,15 @@ class Store {
         ];
 
         foreach (self::getSensoriByIdUtenza($id) as $row) {
+
+            /*
+             * Se $tipologia non ha un indice per $row['tipologia'],
+             * allora vuol dire che è stato utilizzato un nuovo sensore e per
+             * evitare errori di richiesta per OpenTSDB, allora non conteggia
+             * il nuovo sensore.
+             */
+            if (!self::varVal($row['tipologia'], $tipologia, false)) continue;
+
             $data['sensori'][] = [
                 'parent' => [
                     'id_unita_immobiliare' => (string)$row['numero_contatore']
@@ -625,19 +658,19 @@ class Store {
     {
         foreach (self::getConsumiElettriciByNumeroContatoreAndCodiceFiscale($numeroContatore, $utenza['codice_fiscale']) as $row) {
             $data['elettrici'][] = [
-                'anno' => $row['anno'],
+                'anno' => (string)$row['anno'],
                 'numero_mesi_fatturati' => $row['num_mesi_fatturazione'],
-                'ammontare_netto_iva' => $row['ammontare_netto_iva'],
-                'kw_fatturati' => $row['kw_fatturati']
+                'ammontare_netto_iva' => self::parseFloat($row['ammontare_netto_iva']),
+                'kw_fatturati' => self::parseFloat($row['kw_fatturati'])
             ];
         }
 
         foreach (self::getConsumiGasByNumeroContatoreAndCodiceFiscale($numeroContatore, $utenza['codice_fiscale']) as $row) {
             $data['gas'][] = [
-                'anno' => $row['anno'],
+                'anno' => (string)$row['anno'],
                 'numero_mesi_fatturati' => $row['num_mesi_fatturati'],
-                'ammontare_netto_iva' => $row['ammontare_fatturato'],
-                'mc_fatturati' => $row['consumo_fatturato']
+                'ammontare_netto_iva' => self::parseFloat($row['ammontare_fatturato']),
+                'mc_fatturati' => self::parseFloat($row['consumo_fatturato'])
             ];
         }
     }
