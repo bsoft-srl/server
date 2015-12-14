@@ -360,10 +360,9 @@ class Store {
      */
     private static function withUtenza($id, array &$data)
     {
-
         $tipologie = [
-            0 => 'privato',
-            1 => 'pubblico',
+            0 => 'privata',
+            1 => 'pubblica',
             2 => 'commerciale'
         ];
 
@@ -373,7 +372,8 @@ class Store {
             'id' => $row['id'],
             'codice_fiscale' => $row['codice_fiscale'],
             'tipologia' => $row['tipologia'],
-            'tipologia_desc' => self::varVal($row['tipologia'], $tipologie, 'altro')
+            'tipologia_desc' => self::varVal($row['tipologia'], $tipologie, 'altro'),
+            'nome_cognome' => self::varVal('nome_cognome', $row, $row['codice_fiscale'])
         ];
     }
 
@@ -432,13 +432,12 @@ class Store {
      */
     private static function withUnitaImmobiliare($utenza, array &$data)
     {
-
         $tipologia = [
-            0 => 'residenziale',
-            1 => 'commerciale',
-            2 => 'uffici',
-            3 => 'scuole',
-            4 => 'impianti sportivi'
+            0 => 'appartamento',
+            1 => 'negozio',
+            2 => 'ufficio',
+            3 => 'scuola',
+            4 => 'impianto sportivo'
         ];
 
         foreach (self::getUnitaUmmobiliariByIdUtenza($utenza['id']) as $row) {
@@ -452,7 +451,7 @@ class Store {
                     'id_edificio' => $row['id_edificio']
                 ],
                 'parent_id' => (string)$row['id_edificio'],
-                'tipologia' => self::varVal($row['tipo'], $tipologia),
+                'tipologia' => ucwords(self::varVal($row['tipo'], $tipologia)),
                 'consumi_annuali' => [
                     'elettrici_kwh' => self::parseFloat($row['consumi_elettrici_kwh_anno']),
                     'idrici_mc' => self::parseFloat($row['consumi_idrici_mc_anno']),
@@ -593,35 +592,69 @@ class Store {
      */
     private static function withSensori($id, array &$data)
     {
-
         $tipologia = [
+            /** */
             0 => [
-                'energia_elettrica',
-                'Misuratore contatore elettrico'
+                'metric' => 'energia_elettrica',
+                'desc' => 'Elettrico',
+                'c' => [
+                    'Energia Elettrica Attiva (KWh)',
+                    'Energia Elettrica Reattiva (Kvarh)'
+                ]
             ],
-            1 => [
-                'generico',
-                'Misuratore ad impulsi generico'
-            ],
+
+            /** */
             2 => [
-                'ambientale',
-                'Misuratore ambientale'
+                'metric' => 'ambientale',
+                'desc' => 'Ambientale indoor',
+                'c' => [
+                    'Gradi Celsius (° C)',
+                    'Umidità (%)',
+                    'CO2 (Ppm)'
+                ]
             ],
+
+            /** */
             3 => [
-                'ambientale_out_2ch',
-                'Misuratore ambientale (2ch)'
+                'metric' => 'ambientale_out_2ch',
+                'desc' => 'Ambientale outdoor',
+                'c' => [
+                    'Gradi Celsius (° C)',
+                    'Umidità (%)'
+                ]
             ],
+
+            /** */
             4 => [
-                'ambientale_out_3ch',
-                'Misuratore ambientale (3ch)'
+                'metric' => 'ambientale_out_3ch',
+                'desc' => 'Ambientale outdoor',
+                'c' => [
+                    'Gradi Celsius (° C)',
+                    'Gradi Celsius (° C)',
+                    'Gradi Celsius (° C)'
+                ]
             ],
+
+            /** */
             5 => [
-                'ambientale_out_meteo_3ch',
-                'Meteo'
+                'metric' => 'ambientale_out_meteo_3ch',
+                'desc' => 'Meteo',
+                'c' => [
+                    'Radiazione Solare (W/m2)',
+                    'Direzione vento (°)',
+                    'Velocità vento (m/s)'
+                ]
             ],
+
+            /** */
             6 => [
-                'produzione',
-                'Fotovoltaico'
+                'metric' => 'produzione',
+                'desc' => 'Produzione fotovoltaico',
+                'c' => [
+                    'Gradi Celsius (° C)',
+                    'Corrente (A)',
+                    'Tensione (V)'
+                ]
             ]
         ];
 
@@ -643,8 +676,7 @@ class Store {
                 'mac_address' => $row['mac'],
                 'mac_address_datalogger' => $row['mac_datalogger'],
                 'numero_canali' => $row['numero_canali'],
-                'tipologia' => $tipologia[$row['tipologia']][0],
-                'tipologia_desc' => $tipologia[$row['tipologia']][1],
+                'tipologia' => $tipologia[$row['tipologia']],
                 'in_manutenzione' => $row['manutenzione'],
                 'ultimo_aggiornamento' => $row['lastupdate']
             ];
@@ -791,13 +823,9 @@ class Store {
         if (in_array('g', $incs)) {
             self::withGeoJson('perimetro_quartiere', $data);
             self::withGeoJson('grafo_viario', $data);
-
-            if ($tipologia == 0)
-                self::withGeoJson('privato', $data);
-            else if ($tipologia == 1)
-                self::withGeoJson('pubblico', $data);
-            else if ($tipologia == 2)
-                self::withGeoJson('commerciale', $data);
+            self::withGeoJson('privato', $data);
+            self::withGeoJson('pubblico', $data);
+            self::withGeoJson('commerciale', $data);
         }
 
 
@@ -891,6 +919,25 @@ class Store {
      /**
       *
       */
+     private static function getMeteoCondizioneNumerica($icona) {
+         $condizioni = [
+             '01' => 1, //'clear sky',
+             '02' => 2, //'few clouds',
+             '03' => 3, //'scattered clouds',
+             '04' => 4, //'broken clouds',
+             '09' => 5, //'shower rain',
+             '10' => 6, //'rain',
+             '13' => 7, //'snow',
+             '50' => 8, //'mist'
+             '11' => 9 //'thunderstorm',
+         ];
+
+         return $condizioni[preg_replace('|[^\d]+|', '', $icona)];
+     }
+
+     /**
+      *
+      */
      private static function withWeather(&$data)
      {
          $url = 'http://api.openweathermap.org/data/2.5/weather?id=6541869&units=metric&APPID=' . Config::OWM_APPID;
@@ -910,7 +957,11 @@ class Store {
              'vento' => [
                  'velocita_km_h' => ceil($result['wind']['speed'] * 3.6), // converto i m/s in Km/h
                  //'direzione_deg' => ceil($result['wind']['deg'])
-             ]
+             ],
+
+             /** */
+             'mese' => date('n', $result['dt']),
+             'condizione' => self::getMeteoCondizioneNumerica($result['weather'][0]['icon'])
          ];
      }
 
@@ -940,7 +991,11 @@ class Store {
                  'vento' => [
                      'velocita_km_h' => ceil($row['speed'] * 3.6),
                      'direzione_deg' => ceil($row['deg'])
-                 ]
+                 ],
+
+                 /** */
+                 'mese' => intval(date('n', $row['dt'])),
+                 'condizione' => self::getMeteoCondizioneNumerica($row['weather'][0]['icon'])
              ];
          }
      }
